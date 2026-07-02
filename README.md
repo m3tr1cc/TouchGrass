@@ -2,7 +2,7 @@
 
 TouchGrass is a PromptParty-ready interactive web app: a full-frame pixel-art grass patch where visitors can move the cursor through animated grass and click or tap to grow white flowers.
 
-The app is intentionally lightweight and iframe-friendly. It uses a procedural Canvas 2D renderer, stores flower drawings locally in the browser, and has no backend requirement for v1.
+The app is intentionally lightweight and iframe-friendly. It uses a procedural Canvas 2D renderer, clears drawings on refresh, and has no backend requirement for v1.
 
 ## Stack
 
@@ -32,7 +32,8 @@ npm run build
 
 - Move the cursor or finger over the grass to push blades aside.
 - Click or tap to grow a white flower.
-- Flowers persist in `localStorage` under `touchgrass.flowers.v1`.
+- Click/tap and drag to grow a spaced flower streak.
+- Flowers clear on refresh so every PromptParty feed encounter starts with a fresh grass patch.
 - The renderer respects `prefers-reduced-motion` by reducing nonessential wind movement.
 
 ## Visual References

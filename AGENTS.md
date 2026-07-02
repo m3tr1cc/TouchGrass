@@ -28,7 +28,8 @@ The core experience must stay focused:
 - idle animation feels organic and calm
 - pointer hover visibly parts the grass
 - click/tap grows a flower at the selected location
-- flower drawings persist locally unless a task explicitly changes persistence
+- click/tap and drag grows spaced flower streaks
+- flower drawings clear on refresh so every feed encounter starts fresh
 
 ## Supabase migrations
 

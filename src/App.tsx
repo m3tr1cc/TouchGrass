@@ -16,8 +16,16 @@ type PointerState = {
   active: boolean
 }
 
-const STORAGE_KEY = 'touchgrass.flowers.v1'
+type CanvasPoint = {
+  x: number
+  y: number
+  normalizedX: number
+  normalizedY: number
+}
+
+const LEGACY_STORAGE_KEY = 'touchgrass.flowers.v1'
 const MAX_FLOWERS = 420
+const FLOWER_SPACING_PX = 46
 const GOLDEN_ANGLE = 2.399963229728653
 
 function clamp(value: number, min: number, max: number) {
@@ -32,41 +40,6 @@ function hash2(x: number, y: number) {
 
 function hash1(value: number) {
   return hash2(value, value * 31 + 17)
-}
-
-function readStoredFlowers(): Flower[] {
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY)
-    if (!raw) {
-      return []
-    }
-
-    const parsed = JSON.parse(raw) as Flower[]
-    if (!Array.isArray(parsed)) {
-      return []
-    }
-
-    return parsed
-      .filter((flower) => {
-        return (
-          typeof flower.id === 'string' &&
-          Number.isFinite(flower.x) &&
-          Number.isFinite(flower.y) &&
-          Number.isFinite(flower.seed) &&
-          Number.isFinite(flower.scale) &&
-          Number.isFinite(flower.createdAt)
-        )
-      })
-      .slice(-MAX_FLOWERS)
-      .map((flower) => ({
-        ...flower,
-        x: clamp(flower.x, 0, 1),
-        y: clamp(flower.y, 0, 1),
-        scale: clamp(flower.scale, 0.72, 1.36),
-      }))
-  } catch {
-    return []
-  }
 }
 
 function drawStem(ctx: CanvasRenderingContext2D, x: number, y: number, height: number, sway: number, unit: number) {
@@ -222,17 +195,16 @@ function App() {
   const flowersRef = useRef<Flower[]>([])
   const pointerRef = useRef<PointerState>({ x: 0, y: 0, active: false })
   const reducedMotionRef = useRef(false)
+  const isPlantingRef = useRef(false)
+  const lastFlowerPointRef = useRef<CanvasPoint | null>(null)
   const [flowers, setFlowers] = useState<Flower[]>([])
 
   useEffect(() => {
-    const stored = readStoredFlowers()
-    flowersRef.current = stored
-    setFlowers(stored)
+    window.localStorage.removeItem(LEGACY_STORAGE_KEY)
   }, [])
 
   useEffect(() => {
     flowersRef.current = flowers
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(flowers))
   }, [flowers])
 
   useEffect(() => {
@@ -280,28 +252,45 @@ function App() {
     return () => window.cancelAnimationFrame(animationFrame)
   }, [])
 
-  const updatePointer = useCallback((event: React.PointerEvent<HTMLCanvasElement>, active = true) => {
+  const getCanvasPoint = useCallback((event: React.PointerEvent<HTMLCanvasElement>): CanvasPoint => {
     const rect = event.currentTarget.getBoundingClientRect()
-    pointerRef.current = {
-      x: event.clientX - rect.left,
-      y: event.clientY - rect.top,
-      active,
+    const x = event.clientX - rect.left
+    const y = event.clientY - rect.top
+
+    return {
+      x,
+      y,
+      normalizedX: clamp(x / rect.width, 0, 1),
+      normalizedY: clamp(y / rect.height, 0.08, 0.98),
     }
   }, [])
 
-  const addFlower = useCallback((event: React.PointerEvent<HTMLCanvasElement>) => {
-    const rect = event.currentTarget.getBoundingClientRect()
-    const x = clamp((event.clientX - rect.left) / rect.width, 0, 1)
-    const y = clamp((event.clientY - rect.top) / rect.height, 0.08, 0.98)
+  const updatePointer = useCallback((event: React.PointerEvent<HTMLCanvasElement>, active = true) => {
+    const point = getCanvasPoint(event)
+    pointerRef.current = {
+      x: point.x,
+      y: point.y,
+      active,
+    }
+    return point
+  }, [getCanvasPoint])
+
+  const addFlower = useCallback((point: CanvasPoint, force = false) => {
+    const lastPoint = lastFlowerPointRef.current
+    if (!force && lastPoint && Math.hypot(point.x - lastPoint.x, point.y - lastPoint.y) < FLOWER_SPACING_PX) {
+      return
+    }
+
     const seed = Math.random()
     const createdAt = performance.now()
+    lastFlowerPointRef.current = point
 
     setFlowers((current) => [
       ...current.slice(Math.max(0, current.length - MAX_FLOWERS + 1)),
       {
         id: `${Date.now().toString(36)}-${Math.floor(seed * 100000).toString(36)}`,
-        x,
-        y,
+        x: point.normalizedX,
+        y: point.normalizedY,
         seed,
         scale: 0.76 + seed * 0.48,
         createdAt,
@@ -317,22 +306,43 @@ function App() {
         aria-label="Animated patch of grass. Click or tap to grow white flowers."
         role="img"
         onPointerDown={(event) => {
-          updatePointer(event)
+          const point = updatePointer(event)
+          isPlantingRef.current = true
+          lastFlowerPointRef.current = null
           event.currentTarget.setPointerCapture(event.pointerId)
-          addFlower(event)
+          addFlower(point, true)
         }}
-        onPointerMove={updatePointer}
+        onPointerMove={(event) => {
+          const point = updatePointer(event)
+          if (isPlantingRef.current) {
+            addFlower(point)
+          }
+        }}
+        onPointerUp={(event) => {
+          isPlantingRef.current = false
+          lastFlowerPointRef.current = null
+          if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+            event.currentTarget.releasePointerCapture(event.pointerId)
+          }
+        }}
         onPointerEnter={updatePointer}
         onPointerLeave={() => {
           pointerRef.current.active = false
+          isPlantingRef.current = false
+          lastFlowerPointRef.current = null
         }}
-        onPointerCancel={() => {
+        onPointerCancel={(event) => {
           pointerRef.current.active = false
+          isPlantingRef.current = false
+          lastFlowerPointRef.current = null
+          if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+            event.currentTarget.releasePointerCapture(event.pointerId)
+          }
         }}
       />
       <p className="sr-only">
         TouchGrass is an interactive grass patch. Move the pointer over the grass to part the blades, then click or tap
-        to grow a white flower. Flowers are stored locally in this browser.
+        and drag to grow spaced streaks of white flowers. Flowers clear when the project refreshes.
       </p>
     </main>
   )

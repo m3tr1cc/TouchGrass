@@ -32,8 +32,8 @@ const LEGACY_STORAGE_KEY = 'touchgrass.flowers.v1'
 const MAX_FLOWERS = 420
 const FLOWER_SPACING_PX = 46
 const FLOWER_SPRITE_SRC = '/flower-sprite.png'
-const FLOWER_SPRITE_ANCHOR_X = 0.4997
-const FLOWER_SPRITE_ANCHOR_Y = 0.3515
+const FLOWER_SPRITE_ANCHOR_X = 0.5
+const FLOWER_SPRITE_ANCHOR_Y = 1
 const FLOWER_SPRITE_ASPECT = 64 / 84
 
 function clamp(value: number, min: number, max: number) {
@@ -93,7 +93,7 @@ function drawFlower(
   const grow = clamp(age / 520, 0, 1)
   const breezeX = reducedMotion ? 0 : Math.sin(time * 0.0014 + flower.seed * 8.9) * unit * 1.8
   const breezeY = reducedMotion ? 0 : Math.sin(time * 0.001 + flower.seed * 4.7) * unit * 0.28
-  const spriteHeight = unit * 28 * flower.scale * (0.35 + grow * 0.65)
+  const spriteHeight = unit * 21 * flower.scale * (0.35 + grow * 0.65)
   const spriteWidth = spriteHeight * FLOWER_SPRITE_ASPECT
   const anchorX = x + breezeX
   const anchorY = y + breezeY

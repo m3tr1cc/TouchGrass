@@ -33,9 +33,10 @@ npm run build
 - Move the cursor or finger over the grass to push blades aside.
 - Click or tap to grow a white flower.
 - Click/tap and drag to grow a spaced flower streak.
+- The flower uses the transparent sprite at `public/flower-sprite.png`; its yellow center is placed at the exact click or drag coordinate.
 - Flowers clear on refresh so every PromptParty feed encounter starts with a fresh grass patch.
 - The renderer respects `prefers-reduced-motion` by reducing nonessential wind movement.
 
 ## Visual References
 
-Reference images provided with the project brief are stored in `docs/reference/`.
+Reference images provided with the project brief are stored in `docs/reference/`, including the pixel flower model used to create the transparent runtime sprite.

@@ -29,6 +29,7 @@ The core experience must stay focused:
 - pointer hover visibly parts the grass
 - click/tap grows a flower at the selected location
 - click/tap and drag grows spaced flower streaks
+- the yellow flower center is the placement coordinate; do not anchor placement at the stem base
 - flower drawings clear on refresh so every feed encounter starts fresh
 
 ## Supabase migrations
@@ -58,7 +59,7 @@ npm run build
 
 The grass patch should follow the supplied green pixel-art grass reference: dense, tiled, saturated greens, with blocky vertical and diagonal grass marks.
 
-The flower should follow the supplied reference: simple white rounded petals with a warm yellow center, readable at small sizes, and animated gently with the grass.
+The flower should use the transparent sprite at `public/flower-sprite.png`, extracted from the supplied pixel reference. Keep the yellow flower center as the drawing coordinate and preserve gentle wind motion.
 
 Avoid UI chrome, cards, text overlays, marketing sections, nav bars, and decorative elements that compete with the canvas. The first screen is the product.
 

@@ -23,10 +23,18 @@ type CanvasPoint = {
   normalizedY: number
 }
 
+type FlowerSprite = {
+  image: HTMLImageElement
+  loaded: boolean
+}
+
 const LEGACY_STORAGE_KEY = 'touchgrass.flowers.v1'
 const MAX_FLOWERS = 420
 const FLOWER_SPACING_PX = 46
-const GOLDEN_ANGLE = 2.399963229728653
+const FLOWER_SPRITE_SRC = '/flower-sprite.png'
+const FLOWER_SPRITE_ANCHOR_X = 0.5
+const FLOWER_SPRITE_ANCHOR_Y = 1
+const FLOWER_SPRITE_ASPECT = 64 / 84
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value))
@@ -36,18 +44,6 @@ function hash2(x: number, y: number) {
   let n = x * 374761393 + y * 668265263
   n = (n ^ (n >>> 13)) * 1274126177
   return ((n ^ (n >>> 16)) >>> 0) / 4294967295
-}
-
-function hash1(value: number) {
-  return hash2(value, value * 31 + 17)
-}
-
-function drawStem(ctx: CanvasRenderingContext2D, x: number, y: number, height: number, sway: number, unit: number) {
-  ctx.fillStyle = '#2a781f'
-  const width = Math.max(unit, unit * 1.25)
-  ctx.fillRect(Math.round(x - width / 2 + sway * 0.32), Math.round(y - height), width, height)
-  ctx.fillStyle = '#76bd3c'
-  ctx.fillRect(Math.round(x + sway * 0.55), Math.round(y - height * 0.66), Math.max(unit, width * 0.7), height * 0.42)
 }
 
 function drawGrassBlade(
@@ -85,42 +81,30 @@ function drawFlower(
   time: number,
   unit: number,
   reducedMotion: boolean,
+  flowerSprite: FlowerSprite | null,
 ) {
+  if (!flowerSprite?.loaded) {
+    return
+  }
+
   const x = flower.x * width
   const y = flower.y * height
   const age = Math.max(0, time - flower.createdAt)
   const grow = clamp(age / 520, 0, 1)
-  const breeze = reducedMotion ? 0 : Math.sin(time * 0.0014 + flower.seed * 8.9) * unit * 1.7
-  const size = unit * 9.2 * flower.scale * (0.35 + grow * 0.65)
-  const stemHeight = size * 2.2
-  const stemX = x + breeze * 0.4
-  const bloomY = y - stemHeight
+  const breezeX = reducedMotion ? 0 : Math.sin(time * 0.0014 + flower.seed * 8.9) * unit * 1.8
+  const breezeY = reducedMotion ? 0 : Math.sin(time * 0.001 + flower.seed * 4.7) * unit * 0.28
+  const spriteHeight = unit * 21 * flower.scale * (0.35 + grow * 0.65)
+  const spriteWidth = spriteHeight * FLOWER_SPRITE_ASPECT
+  const anchorX = x + breezeX
+  const anchorY = y + breezeY
 
-  drawStem(ctx, x, y, stemHeight, breeze, unit)
-
-  for (let i = 0; i < 6; i += 1) {
-    const angle = i * GOLDEN_ANGLE + flower.seed * 5.2
-    const px = stemX + Math.cos(angle) * size * 0.43
-    const py = bloomY + Math.sin(angle) * size * 0.33
-    const petalW = size * (0.66 + hash1(flower.seed * 100 + i) * 0.12)
-    const petalH = size * 0.56
-
-    ctx.fillStyle = '#fdfdf2'
-    ctx.beginPath()
-    ctx.ellipse(px, py, petalW * 0.5, petalH * 0.5, angle, 0, Math.PI * 2)
-    ctx.fill()
-
-    ctx.fillStyle = 'rgba(220, 255, 246, 0.65)'
-    ctx.fillRect(Math.round(px - unit), Math.round(py - petalH * 0.28), Math.max(unit, unit * 1.1), Math.max(unit, unit * 1.1))
-  }
-
-  ctx.fillStyle = '#ffc20d'
-  ctx.beginPath()
-  ctx.ellipse(stemX, bloomY, size * 0.34, size * 0.32, 0, 0, Math.PI * 2)
-  ctx.fill()
-
-  ctx.fillStyle = '#e6a600'
-  ctx.fillRect(Math.round(stemX - size * 0.13), Math.round(bloomY - unit * 0.5), Math.max(unit, size * 0.26), Math.max(unit, unit * 1.25))
+  ctx.drawImage(
+    flowerSprite.image,
+    Math.round(anchorX - spriteWidth * FLOWER_SPRITE_ANCHOR_X),
+    Math.round(anchorY - spriteHeight * FLOWER_SPRITE_ANCHOR_Y),
+    Math.round(spriteWidth),
+    Math.round(spriteHeight),
+  )
 }
 
 function drawScene(
@@ -131,6 +115,7 @@ function drawScene(
   pointer: PointerState,
   time: number,
   reducedMotion: boolean,
+  flowerSprite: FlowerSprite | null,
 ) {
   const unit = Math.max(2, Math.floor(Math.min(width, height) / 180))
   const tile = unit * 16
@@ -187,7 +172,7 @@ function drawScene(
   flowers
     .slice()
     .sort((a, b) => a.y - b.y)
-    .forEach((flower) => drawFlower(ctx, flower, width, height, time, unit, reducedMotion))
+    .forEach((flower) => drawFlower(ctx, flower, width, height, time, unit, reducedMotion, flowerSprite))
 }
 
 function App() {
@@ -197,6 +182,7 @@ function App() {
   const reducedMotionRef = useRef(false)
   const isPlantingRef = useRef(false)
   const lastFlowerPointRef = useRef<CanvasPoint | null>(null)
+  const flowerSpriteRef = useRef<FlowerSprite | null>(null)
   const [flowers, setFlowers] = useState<Flower[]>([])
 
   useEffect(() => {
@@ -216,6 +202,18 @@ function App() {
     updateMotionPreference()
     query.addEventListener('change', updateMotionPreference)
     return () => query.removeEventListener('change', updateMotionPreference)
+  }, [])
+
+  useEffect(() => {
+    const image = new Image()
+    const sprite: FlowerSprite = { image, loaded: false }
+    flowerSpriteRef.current = sprite
+
+    image.onload = () => {
+      sprite.loaded = true
+    }
+
+    image.src = FLOWER_SPRITE_SRC
   }, [])
 
   useEffect(() => {
@@ -244,7 +242,16 @@ function App() {
 
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
       ctx.imageSmoothingEnabled = false
-      drawScene(ctx, rect.width, rect.height, flowersRef.current, pointerRef.current, time, reducedMotionRef.current)
+      drawScene(
+        ctx,
+        rect.width,
+        rect.height,
+        flowersRef.current,
+        pointerRef.current,
+        time,
+        reducedMotionRef.current,
+        flowerSpriteRef.current,
+      )
       animationFrame = window.requestAnimationFrame(render)
     }
 
@@ -261,7 +268,7 @@ function App() {
       x,
       y,
       normalizedX: clamp(x / rect.width, 0, 1),
-      normalizedY: clamp(y / rect.height, 0.08, 0.98),
+      normalizedY: clamp(y / rect.height, 0, 1),
     }
   }, [])
 
